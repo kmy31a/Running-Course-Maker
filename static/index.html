@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>송도 러닝·산책 코스 메이커</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--bg:#f2f6f4;--card:#fff;--ink:#14231c;--mute:#5d6f66;--line:#e1e9e4;--brand:#16a36a;--brand-d:#0f7f52;--brand-s:#e3f5ec;
+ --amber:#0b6b45;--amber-s:#d6efe2;--blue-s:#eaf6f0;--blue:#1f7a52;--red-s:#e4f2ea;--err-s:#fde8e8;--shadow:0 2px 14px rgba(20,35,28,.07)}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1613;--card:#17221d;--ink:#e8f1ec;--mute:#93a79c;--line:#27372f;--brand:#2fc58a;--brand-d:#25a574;--brand-s:#173528;
+ --amber:#2fc58a;--amber-s:#1f3d2f;--blue-s:#1a2d23;--blue:#7fdcae;--red-s:#1c3026;--err-s:#3d1d1d;--shadow:0 2px 14px rgba(0,0,0,.4)}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans KR","Malgun Gothic",sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:560px;margin:0 auto;padding:0 16px 48px}
+.hero{margin:0 -16px 18px;padding:34px 24px 54px;color:#fff;border-radius:0 0 28px 28px;
+ background:linear-gradient(135deg,#0f7f52 0%,#16a36a 55%,#3cc5a0 100%);position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;right:-40px;top:-40px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.12)}
+.hero .eyebrow{font-size:12px;font-weight:700;letter-spacing:.08em;opacity:.85}
+.hero h1{margin:6px 0 8px;font-size:27px;font-weight:900;line-height:1.25}
+.hero p{margin:0;font-size:14px;opacity:.92}
+.panel{background:var(--card);border-radius:20px;padding:20px 18px 22px;box-shadow:var(--shadow);margin-top:-36px;position:relative}
+.grp{margin-bottom:18px}.grp:last-of-type{margin-bottom:6px}
+.lab{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--mute);margin-bottom:8px;flex-wrap:wrap}
+.lab em{font-style:normal;font-weight:400;font-size:12px;opacity:.8}
+select,input[type=number]{width:100%;padding:12px 14px;font-size:16px;font-weight:500;font-family:inherit;color:var(--ink);background:var(--bg);border:1.5px solid var(--line);border-radius:12px;outline:none}
+select:focus,input[type=number]:focus{border-color:var(--brand)}
+.opts{display:flex;gap:8px;flex-wrap:wrap}.opts label{cursor:pointer;flex:0 0 auto;position:relative}.opts input{position:absolute;opacity:0;pointer-events:none}
+.opts span{display:block;padding:9px 16px;font-size:14px;font-weight:500;border:1.5px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);transition:.15s}
+.opts input:checked+span{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:700}
+.opts input:focus-visible+span{outline:3px solid var(--brand-s);outline-offset:1px}
+#minutes{display:grid;grid-template-columns:repeat(3,1fr)}#minutes label{display:block}#minutes span{border-radius:14px;text-align:center;padding:14px 0;font-size:17px;font-weight:700}
+#go{width:100%;margin-top:18px;padding:16px;font-size:17px;font-weight:900;font-family:inherit;color:#fff;background:linear-gradient(135deg,var(--brand-d),var(--brand));border:0;border-radius:14px;cursor:pointer;box-shadow:0 6px 16px rgba(22,163,106,.35)}
+#go:active{transform:translateY(1px)}#go:disabled{opacity:.6;cursor:wait}
+.sec{margin:30px 4px 12px;font-size:19px;font-weight:900}.sec small{display:block;margin-top:2px;font-size:12px;font-weight:400;color:var(--mute)}
+.card{background:var(--card);border-radius:20px;padding:18px;margin-bottom:16px;box-shadow:var(--shadow);border:2px solid transparent}
+.card.primary{border-color:var(--amber)}
+.card header{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+.mins{display:flex;align-items:baseline;gap:2px;background:var(--brand-s);color:var(--brand-d);border-radius:16px;padding:8px 16px}
+.card.primary .mins{background:var(--amber);color:#fff}
+@media(prefers-color-scheme:dark){.card.primary .mins{color:#06241a}}
+.mins b{font-size:32px;font-weight:900;line-height:1}.mins span{font-size:14px;font-weight:700}
+@media(prefers-color-scheme:dark){.mins{color:var(--brand)}}
+.pick{display:inline-block;font-size:11px;font-weight:700;background:var(--amber-s);color:var(--brand-d);border-radius:6px;padding:1px 8px;margin-bottom:4px}
+.tags{display:flex;flex-wrap:wrap;gap:4px}.tag{font-size:12px;font-weight:500;background:var(--blue-s);color:var(--blue);border-radius:999px;padding:2px 10px}.tag.alt{background:var(--brand-s);color:var(--brand-d)}
+@media(prefers-color-scheme:dark){.tag.alt{color:var(--brand)}}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-bottom:12px}
+.st{background:var(--bg);border-radius:14px;padding:10px 6px;text-align:center}
+.st i{font-style:normal;font-size:16px;display:block}.st b{font-size:22px;font-weight:900;line-height:1.2}.st small{display:block;font-size:11px;color:var(--mute)}
+.map{height:230px;border-radius:14px;overflow:hidden;border:1px solid var(--line);position:relative;z-index:0}
+.desc{margin:12px 2px 8px;font-size:14px}
+.note{border-radius:12px;padding:10px 14px;font-size:13.5px;margin-top:8px}.note b{display:block;margin-bottom:2px}
+.note ul{margin:2px 0 0;padding-left:18px}.tips{background:var(--amber-s)}.interval{background:var(--red-s)}
+.motive{margin-top:10px;padding:10px 14px;border-radius:12px;background:var(--brand-s);color:var(--brand-d);font-size:14px;font-weight:700;text-align:center}
+@media(prefers-color-scheme:dark){.motive{color:var(--brand)}}
+.rec{width:100%;margin-top:12px;padding:13px;font-size:15px;font-weight:700;font-family:inherit;color:var(--brand-d);background:transparent;border:2px solid var(--brand);border-radius:12px;cursor:pointer}
+.rec:hover{background:var(--brand-s)}.rec:disabled{opacity:.6;border-style:dashed;cursor:default}
+@media(prefers-color-scheme:dark){.rec{color:var(--brand)}}
+.err{background:var(--err-s);color:#c0392b;border-radius:14px;padding:14px 16px;margin-top:16px;font-weight:700}
+.skel{height:200px;border-radius:20px;margin-top:16px;background:linear-gradient(90deg,var(--card),var(--line),var(--card));background-size:200% 100%;animation:sk 1.2s infinite}
+@keyframes sk{to{background-position:-200% 0}}
+#log{background:var(--card);border-radius:20px;padding:4px 18px 20px;box-shadow:var(--shadow);margin-top:30px}#log .sec{margin:16px 0 12px}
+.week{font-size:14px;margin:6px 0}.week b{color:var(--brand)}.prog{background:var(--line);border-radius:8px;height:10px;overflow:hidden;margin-top:6px}.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--brand-d),var(--brand));border-radius:8px}
+.bars{display:flex;gap:6px;align-items:flex-end;height:112px;margin-top:14px}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.bar i{display:block;width:100%;max-width:28px;background:var(--brand);border-radius:6px 6px 0 0;min-height:3px;opacity:.85}.bar em{font-style:normal;font-size:10px;color:var(--mute);height:14px}.bar span{font-size:11px;color:var(--mute);margin-top:4px}
+.cap{font-size:11px;color:var(--mute);text-align:center;margin-top:2px}
+.badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}.badge{padding:6px 12px;border-radius:999px;font-size:13px;background:var(--bg);color:var(--mute);border:1px dashed var(--line);filter:grayscale(1);opacity:.7}
+.badge.on{background:var(--amber-s);color:var(--brand-d);font-weight:700;border:1px solid var(--brand);filter:none;opacity:1}
+@media(prefers-color-scheme:dark){.badge.on{color:var(--brand)}}
+.rec.track{background:var(--brand);color:#fff;border-color:var(--brand);margin-top:8px}.rec.track:hover{background:var(--brand-d)}
+.recent{margin-top:14px;display:grid;gap:6px}.recent div{display:flex;justify-content:space-between;gap:8px;font-size:13px;background:var(--bg);border-radius:10px;padding:8px 12px}
+.recent small{color:var(--mute)}
+#trk{position:fixed;inset:0;z-index:2000;background:var(--bg);display:none;flex-direction:column}
+#trk.on{display:flex}
+#tmap{flex:1;min-height:200px;z-index:0}
+.tpanel{background:var(--card);border-radius:24px 24px 0 0;padding:16px 18px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -4px 20px rgba(0,0,0,.12);margin-top:-20px;position:relative;z-index:1000}
+.tstat{text-align:center}.ttime{font-size:52px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1.1;color:var(--brand-d)}
+@media(prefers-color-scheme:dark){.ttime{color:var(--brand)}}
+.tgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.tgrid .st b{font-size:24px}
+.tmsg{text-align:center;font-size:12.5px;color:var(--mute);min-height:18px}.tmsg.bad{color:#c0392b;font-weight:700}
+.tbtns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.tbtns button{padding:15px;font-size:16px;font-weight:900;font-family:inherit;border-radius:14px;border:0;cursor:pointer}
+#tpause{background:var(--brand-s);color:var(--brand-d)}#tstop{background:var(--brand-d);color:#fff}
+@media(prefers-color-scheme:dark){#tpause{color:var(--brand)}#tstop{background:var(--brand);color:#06241a}}
+footer{text-align:center;font-size:12px;color:var(--mute);margin-top:28px}
+</style></head><body><div class="wrap">
+<section class="hero"><div class="eyebrow">INCHEON SONGDO · RUN &amp; WALK</div>
+ <h1>오늘은 어디로 뛸까?<br>송도 코스 메이커</h1><p>조건만 고르면 20 · 40 · 60분 코스를 바로 추천해 드려요.</p></section>
+<main class="panel">
+ <div class="grp"><div class="lab">📍 출발지</div><select id="start"></select></div>
+ <div class="grp"><div class="lab">⏱ 운동 시간 <em>고른 시간이 강조돼요 (3종은 항상 보여드려요)</em></div><div class="opts" id="minutes"></div></div>
+ <div class="grp"><div class="lab">👟 페이스</div><div class="opts" id="pace"></div></div>
+ <div class="grp"><div class="lab">⛰ 난이도</div><div class="opts" id="type"></div></div>
+ <div class="grp"><div class="lab">🎯 목표</div><div class="opts" id="goal"></div></div>
+ <div class="grp"><div class="lab">🌿 풍경 <em>복수 선택</em></div><div class="opts" id="scenery"></div></div>
+ <div class="grp"><div class="lab">⚖ 체중 <em>칼로리 계산용 (kg)</em></div><input id="weight" type="number" value="65" min="30" max="200" inputmode="numeric"></div>
+ <button id="go">코스 추천받기</button>
+</main>
+<div id="result"></div>
+<div id="log"></div>
+<section id="trk" aria-label="실시간 러닝 추적">
+ <div id="tmap"></div>
+ <div class="tpanel">
+  <div class="tstat"><div class="ttime" id="ttime">00:00</div><div class="tmsg" id="tmsg">GPS 신호를 찾는 중...</div></div>
+  <div class="tgrid">
+   <div class="st"><i>📏</i><b id="tkm">0.00</b><small>km</small></div>
+   <div class="st"><i>⚡</i><b id="tpace">--</b><small>분/km</small></div>
+   <div class="st"><i>🔥</i><b id="tkcal">0</b><small>kcal</small></div>
+  </div>
+  <div class="tbtns"><button id="tpause">⏸ 일시정지</button><button id="tstop">■ 종료·기록</button></div>
+ </div>
+</section>
+<footer>지도 © OpenStreetMap contributors · 오르막은 다리·육교 구간 기준</footer></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+function radios(id,name,items,def,type="radio"){
+ $(id).innerHTML=items.map(v=>`<label><input type="${type}" name="${name}" value="${v}" ${[].concat(def).includes(v)?"checked":""}><span>${v}${name==="minutes"?"분":""}</span></label>`).join("");}
+const val=n=>document.querySelector(`input[name=${n}]:checked`).value;
+fetch("/api/meta").then(r=>r.json()).then(m=>{
+ $("start").innerHTML=`<option value="__gps__">📍 현재 위치</option>`+Object.keys(m.starts).map(s=>`<option>${s}</option>`).join("");
+ radios("minutes","minutes",[20,40,60],40);
+ radios("pace","pace",m.paces,"조깅");
+ radios("type","type",m.types,"평지");
+ radios("goal","goal",m.goals,"다이어트");
+ radios("scenery","scenery",m.scenery,["공원"],"checkbox");
+});
+$("go").onclick=async()=>{
+ const sc=[...document.querySelectorAll("input[name=scenery]:checked")].map(e=>e.value);
+ $("go").disabled=true;$("go").textContent="코스 만드는 중...";$("result").innerHTML=`<div class="skel"></div><div class="skel"></div>`;
+ let pos={start:$("start").value};
+ if(pos.start==="__gps__"){
+  try{const p=SIM?{coords:{latitude:37.3934,longitude:126.6345}}:await new Promise((ok,no)=>navigator.geolocation.getCurrentPosition(ok,no,{timeout:10000,enableHighAccuracy:true}));
+   pos={lat:p.coords.latitude,lon:p.coords.longitude};}
+  catch(e){$("go").disabled=false;$("go").textContent="코스 추천받기";
+   $("result").innerHTML=`<div class="err">현재 위치를 가져오지 못했어요. 위치 권한을 허용하거나 아래 대표 출발지를 선택해 주세요.</div>`;return;}
+ }
+ const res=await fetch("/api/recommend",{method:"POST",headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({...pos,minutes:+val("minutes"),pace:val("pace"),type:val("type"),scenery:sc,goal:val("goal"),weight:+$("weight").value||65})});
+ $("go").disabled=false;$("go").textContent="코스 추천받기";
+ const data=await res.json();data.pace=val("pace");data.type=val("type");LAST=data;
+ if(!res.ok){$("result").innerHTML=`<div class="err">${data.detail}</div>`;return;}
+ const lv=val("pace")+" · "+val("type");
+ data.courses.forEach((c,i)=>c.idx=i);
+ const cs=[...data.courses].sort((a,b)=>(b.minutes===data.primary)-(a.minutes===data.primary));
+ const startName=$("start").value==="__gps__"?"현재 위치":$("start").value;
+ const goal=val("goal"),typ=val("type");
+ $("result").innerHTML=`<h2 class="sec">추천 코스 <small>${startName} 출발 · ${lv} · ${goal}</small></h2>`+cs.map((c,i)=>`
+  <article class="card ${c.minutes===data.primary?"primary":""}">
+   <header><div class="mins"><b>${c.minutes}</b><span>분</span></div>
+    <div class="ttl">${c.minutes===data.primary?'<span class="pick">내가 고른 시간</span>':""}
+     <div class="tags">${sc.map(s=>`<span class="tag">${s}</span>`).join("")}<span class="tag alt">${typ}</span></div></div></header>
+   <div class="stats">
+    <div class="st"><i>📏</i><b>${c.distance_km}</b><small>km</small></div>
+    <div class="st"><i>🔥</i><b>${c.kcal}</b><small>kcal</small></div>
+    <div class="st"><i>🌿</i><b>${c.scenery_match}</b><small>% 풍경 일치</small></div>
+    ${typ==="오르막"?`<div class="st"><i>⛰</i><b>${c.uphill_m}</b><small>m 다리·육교</small></div>`:""}
+   </div>
+   <div class="map" id="m${i}"></div>
+   <p class="desc">${c.description}</p>
+   ${c.interval_plan?`<div class="note interval"><b>⚡ 인터벌 구성</b>${c.interval_plan}</div>`:""}
+   <div class="note tips"><b>💡 운동 팁</b><ul>${c.tips.map(t=>`<li>${t}</li>`).join("")}</ul></div>
+   <div class="motive">${c.motivation}</div>
+   ${$("start").value==="__gps__"?`<button class="rec track" onclick="startTrack(${c.idx})">▶ 이 코스로 실시간 추적 시작</button>`:""}
+   <button class="rec" id="rec${c.idx}" onclick="record(${c.idx})">✔ 이 코스 완료 기록하기 (계획대로)</button>
+  </article>`).join("");
+ cs.forEach((c,i)=>{const m=L.map("m"+i,{scrollWheelZoom:false});
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(m);
+  L.polyline(c.path,{color:"#fff",weight:9,opacity:.9}).addTo(m);
+  const l=L.polyline(c.path,{color:"#16a36a",weight:5,lineJoin:"round"}).addTo(m);
+  m.fitBounds(l.getBounds(),{padding:[18,18]});
+  L.circleMarker(c.path[0],{radius:9,color:"#fff",weight:3,fillColor:"#0b6b45",fillOpacity:1}).addTo(m).bindTooltip("출발 · 도착");});
+ $("result").scrollIntoView({behavior:"smooth"});
+};
+
+// ---- 운동 기록 · 주간 루틴 · 배지 (브라우저 localStorage에 저장) ----
+const KEY="songdo_runlog", WEEK_GOAL=3;
+const load=()=>{try{return JSON.parse(localStorage.getItem(KEY))||[]}catch(e){return []}};
+const save=a=>{try{localStorage.setItem(KEY,JSON.stringify(a))}catch(e){}};
+const dstr=d=>{const z=new Date(d.getTime()-d.getTimezoneOffset()*6e4);return z.toISOString().slice(0,10)};
+let LAST=null;
+function record(i){
+  const c=LAST.courses[i], a=load();
+  a.push({date:dstr(new Date()),minutes:c.minutes,km:c.distance_km,kcal:c.kcal,pace:LAST.pace,type:LAST.type,mode:"plan"});
+  save(a);renderLog();const b=document.getElementById("rec"+i);b.disabled=true;b.textContent="✅ 기록됐어요";
+}
+function streak(a){ // 오늘(또는 어제)부터 거꾸로 이어진 연속 운동 일수
+  const days=new Set(a.map(x=>x.date));let d=new Date(),n=0;
+  if(!days.has(dstr(d)))d.setDate(d.getDate()-1);
+  while(days.has(dstr(d))){n++;d.setDate(d.getDate()-1);}return n;
+}
+function badges(a){
+  const km=a.reduce((s,x)=>s+x.km,0),st=streak(a);
+  return [["🌱 첫 운동",a.length>=1],["🥉 누적 10km",km>=10],["🥈 누적 50km",km>=50],["🥇 누적 100km",km>=100],
+          ["🔥 3일 연속",st>=3],["⚡ 7일 연속",st>=7]];
+}
+function renderLog(){
+  const a=load(),today=new Date(),days=[];
+  for(let i=6;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);days.push(d)}
+  const km=days.map(d=>a.filter(x=>x.date===dstr(d)).reduce((s,x)=>s+x.km,0));
+  const max=Math.max(1,...km),wk=a.filter(x=>x.date>=dstr(days[0]));
+  const wdays=new Set(wk.map(x=>x.date)).size,total=a.reduce((s,x)=>s+x.km,0);
+  document.getElementById("log").innerHTML=`<h2 class="sec">내 운동 기록 <small>이 기기에 저장돼요</small></h2>
+   <div class="stats">
+    <div class="st"><i>📏</i><b>${total.toFixed(1)}</b><small>km 누적</small></div>
+    <div class="st"><i>🔥</i><b>${a.reduce((s,x)=>s+x.kcal,0)}</b><small>kcal 누적</small></div>
+    <div class="st"><i>📅</i><b>${streak(a)}</b><small>일 연속</small></div></div>
+   <div class="week"><span>주간 루틴 <b>${wdays}</b> / ${WEEK_GOAL}일 ${wdays>=WEEK_GOAL?"🎉 달성!":""}</span>
+    <div class="prog"><i style="width:${Math.min(100,wdays/WEEK_GOAL*100)}%"></i></div></div>
+   <div class="bars">${days.map((d,i)=>`<div class="bar"><em>${km[i]?km[i].toFixed(1):""}</em><i style="height:${km[i]/max*70}px"></i><span>${["일","월","화","수","목","금","토"][d.getDay()]}</span></div>`).join("")}</div>
+   <div class="cap">최근 7일 거리 (km)</div>
+   <div class="recent">${a.slice(-4).reverse().map(x=>`<div><span>${x.date.slice(5)} · ${x.pace}/${x.type}</span><span>${x.mode==="gps"?`📡 ${fmtT(x.seconds)} · ${x.km} km`:`계획 ${x.minutes}분 · ${x.km} km`} <small>${x.kcal} kcal</small></span></div>`).join("")}</div>
+   <div class="badges">${badges(a).map(([n,on])=>`<span class="badge ${on?"on":""}">${n}</span>`).join("")}</div>`;
+}
+renderLog();
+
+// ---- 실시간 GPS 러닝 추적 (현재 위치 출발 시) ----
+// 테스트용: 주소 뒤에 ?sim=1 을 붙이면 실제 GPS 대신 추천 코스를 따라 걷는 시뮬레이션으로 동작
+const MET_P={"걷기":3.5,"조깅":7.0,"러닝":9.0}, MET_T={"평지":1,"오르막":1.1,"인터벌":1.1};
+const SIM=new URLSearchParams(location.search).has("sim");
+const fmtT=s=>{s=Math.max(0,Math.round(s||0));const h=Math.floor(s/3600),m=Math.floor(s%3600/60),c=s%60,p=n=>String(n).padStart(2,"0");return (h?h+":":"")+p(m)+":"+p(c)};
+function hav(a,b){const R=6371000,r=x=>x*Math.PI/180,dl=r(b[0]-a[0]),dn=r(b[1]-a[1]);
+  const q=Math.sin(dl/2)**2+Math.cos(r(a[0]))*Math.cos(r(b[0]))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(q));}
+let T=null;
+function tmsg(t,bad){const e=$("tmsg");e.textContent=t;e.className="tmsg"+(bad?" bad":"");}
+async function startTrack(i){
+  if(!SIM&&!navigator.geolocation){alert("이 브라우저는 위치 기능을 지원하지 않아요.");return;}
+  const c=LAST.courses[i];
+  T={c,pts:[],m:0,acc:0,paused:false,runMs:0,lastTick:Date.now(),w:+$("weight").value||65,wl:null};
+  $("trk").classList.add("on");document.body.style.overflow="hidden";
+  $("tpause").textContent="⏸ 일시정지";tmsg("GPS 신호를 찾는 중...");upd();
+  T.map=L.map("tmap",{zoomControl:false}).setView(c.path[0],16);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(T.map);
+  L.polyline(c.path,{color:"#16a36a",weight:6,opacity:.35,dashArray:"2 10"}).addTo(T.map);   // 추천 코스(연하게)
+  T.trail=L.polyline([],{color:"#0b6b45",weight:6}).addTo(T.map);                           // 실제 이동 경로
+  T.me=L.circleMarker(c.path[0],{radius:9,color:"#fff",weight:3,fillColor:"#0b6b45",fillOpacity:1}).addTo(T.map);
+  setTimeout(()=>T.map.invalidateSize(),50);
+  try{T.wl=await navigator.wakeLock.request("screen");}catch(e){}   // 화면 꺼짐 방지(지원 시)
+  T.timer=setInterval(tick,1000);
+  if(SIM){let k=0;const path=c.path;T.sim=setInterval(()=>{const p=path[k%path.length];k++;onPos({coords:{latitude:p[0]+(Math.random()-.5)*1e-5,longitude:p[1]+(Math.random()-.5)*1e-5,accuracy:8},timestamp:Date.now()},true);},250);}
+  else T.watch=navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:0,timeout:15000});
+}
+function onErr(e){tmsg(e.code===1?"위치 권한이 거부됐어요. 브라우저 설정에서 허용해 주세요.":"위치를 가져오지 못했어요. 신호가 약할 수 있어요.",true);}
+function onPos(p,sim){
+  if(!T)return;
+  const pt=[p.coords.latitude,p.coords.longitude];
+  T.me.setLatLng(pt);
+  if(p.coords.accuracy>35&&!sim){tmsg("GPS 정확도가 낮아요 (±"+Math.round(p.coords.accuracy)+"m). 하늘이 트인 곳으로 이동해 보세요.",true);return;}
+  tmsg(T.paused?"일시정지 중":"기록 중 · GPS 정상");
+  if(T.paused){T.last=null;return;}
+  const last=T.pts[T.pts.length-1];
+  if(last){
+    const d=hav(last.p,pt),dt=(p.timestamp-last.t)/1000;
+    if(!sim&&d<3)return;                       // 제자리 떨림 무시
+    if(!sim&&dt>0&&d/dt>12)return;             // 시속 43km 이상 점프는 오차로 보고 무시
+    T.m+=d;
+  }
+  T.pts.push({p:pt,t:p.timestamp});T.trail.addLatLng(pt);
+  T.map.panTo(pt,{animate:true});upd();
+}
+function tick(){ if(!T)return; if(!T.paused){T.runMs+=Date.now()-T.lastTick;} T.lastTick=Date.now(); upd(); }
+function upd(){
+  if(!T)return;const s=T.runMs/1000,km=T.m/1000;
+  $("ttime").textContent=fmtT(s);$("tkm").textContent=km.toFixed(2);
+  $("tpace").textContent=km>0.05?(()=>{const sp=s/km;return Math.floor(sp/60)+"'"+String(Math.round(sp%60)).padStart(2,"0")+'"'})():"--";
+  $("tkcal").textContent=Math.round(MET_P[LAST.pace]*MET_T[LAST.type]*T.w*s/3600);
+}
+$("tpause").onclick=()=>{
+  if(!T)return;T.paused=!T.paused;T.lastTick=Date.now();
+  $("tpause").textContent=T.paused?"▶ 다시 시작":"⏸ 일시정지";tmsg(T.paused?"일시정지 중":"기록 중 · GPS 정상");
+};
+function endTrack(){
+  if(!T)return;clearInterval(T.timer);clearInterval(T.sim);
+  if(T.watch!=null)navigator.geolocation.clearWatch(T.watch);
+  try{T.wl&&T.wl.release();}catch(e){}
+  T.map.remove();$("trk").classList.remove("on");document.body.style.overflow="";T=null;
+}
+$("tstop").onclick=()=>{
+  if(!T)return;
+  const s=Math.round(T.runMs/1000),km=+(T.m/1000).toFixed(2);
+  if(km<0.05&&!confirm("이동 거리가 거의 없어요. 그래도 기록할까요?\n(취소하면 계속 기록해요)"))return;
+  const kcal=Math.round(MET_P[LAST.pace]*MET_T[LAST.type]*T.w*s/3600);
+  const a=load();
+  a.push({date:dstr(new Date()),minutes:Math.max(1,Math.round(s/60)),seconds:s,km,kcal,pace:LAST.pace,type:LAST.type,mode:"gps"});
+  save(a);endTrack();renderLog();
+  document.getElementById("log").scrollIntoView({behavior:"smooth"});
+};
+</script></body>
