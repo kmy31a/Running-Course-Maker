@@ -69,7 +69,8 @@ def enrich(courses, ctx):
             data = _parse(res.choices[0].message.content, len(courses))
             for c, d in zip(courses, data):
                 c["description"], c["motivation"] = d["description"].strip(), d["motivation"].strip()
-                c["tips"] = c["tips"] + [t.strip() for t in d["tips"][:3]]
+                c["ai_tips"] = [t.strip() for t in d["tips"][:3]]   # GPT가 쓴 팁은 따로 둬서 화면에서 🤖로 구분한다
+                c["ai"] = True
             return "llm"
         except Exception as e:
             print("LLM 실패, 규칙 기반으로 대체:", type(e).__name__, e)
