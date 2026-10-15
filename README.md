@@ -13,4 +13,4 @@
 1. 이 폴더를 GitHub 저장소로 올린다.
 2. Render → New → Blueprint(또는 Web Service) → 저장소 선택. `render.yaml`을 자동 인식한다.
 3. 발급된 `https://…onrender.com` 주소를 폰에서 열면 GPS(HTTPS)가 동작한다.
-4. (선택) 환경변수 `ANTHROPIC_API_KEY`를 추가하면 LLM 문구가 켜진다.
+4. (선택) 환경변수 `OPENAI_API_KEY`(모델 변경 시 `OPENAI_MODEL`)를 추가하면 GPT 문구가 켜진다.

@@ -1,4 +1,4 @@
-"""코스 설명·운동 팁 생성. ANTHROPIC_API_KEY가 있으면 LLM, 없으면 규칙 기반 문구.
+"""코스 설명·운동 팁 생성. OPENAI_API_KEY가 있으면 LLM(GPT), 없으면 규칙 기반 문구.
 역할 분리: 거리·칼로리 계산은 engine(코드), 설명·팁·동기부여 문구만 여기서 생성."""
 import os, json
 
@@ -12,7 +12,7 @@ def _load_env(path=os.path.join(os.path.dirname(os.path.abspath(__file__)), ".en
 _load_env()
 
 GOALS = ("다이어트", "기록", "힐링")
-MODEL = "claude-haiku-5-5"
+MODEL = os.environ.get("OPENAI_MODEL", "gpt-5.6-luna")   # 모델명은 .env의 OPENAI_MODEL로 바꿀 수 있다
 
 GOAL_TIP = {
     "다이어트": "일정한 속도로 쉬지 않고 움직이면 지방 연소에 도움이 돼요.",
@@ -34,7 +34,12 @@ def _fallback(c, ctx):
 
 def _parse(text, n):
     """LLM 응답에서 JSON 배열을 꺼내 검증한다. 형식이 틀리면 ValueError."""
-    data = json.loads(text[text.index("["): text.rindex("]") + 1])
+    try:
+        data = json.loads(text)
+    except ValueError:
+        data = json.loads(text[text.index("["): text.rindex("]") + 1])
+    if isinstance(data, dict):
+        data = data.get("courses")
     if not isinstance(data, list) or len(data) != n:
         raise ValueError(f"코스 {n}개가 필요한데 {len(data) if isinstance(data, list) else '?'}개 응답")
     for d in data:
@@ -45,9 +50,9 @@ def _parse(text, n):
 
 def enrich(courses, ctx):
     """courses 각 항목에 description / tips(추가) / motivation을 채우고, 사용한 방식('llm'|'rule')을 돌려준다."""
-    if os.environ.get("ANTHROPIC_API_KEY"):
+    if os.environ.get("OPENAI_API_KEY"):
         try:
-            import anthropic
+            from openai import OpenAI
             facts = [{"분": c["minutes"], "거리km": c["distance_km"], "칼로리kcal": c["kcal"],
                       "풍경일치%": c["scenery_match"], "다리·육교구간m": c["uphill_m"], "인터벌구성": c.get("interval_plan")}
                      for c in courses]
@@ -59,9 +64,9 @@ def enrich(courses, ctx):
                 "단위는 km, kcal, 분만 사용. 오르막은 '다리·육교 구간'이라고만 표현하고 경사·고도는 언급하지 말 것.\n"
                 'JSON 배열만 출력: [{"description":"..","tips":["..",".."],"motivation":".."}, ...] '
                 f"(코스 순서 동일, 총 {len(courses)}개)")
-            msg = anthropic.Anthropic(timeout=20.0, max_retries=1).messages.create(
-                model=MODEL, max_tokens=1500, messages=[{"role": "user", "content": prompt}])
-            data = _parse(msg.content[0].text, len(courses))
+            res = OpenAI(timeout=20.0, max_retries=1).chat.completions.create(
+                model=MODEL, messages=[{"role": "user", "content": prompt}])
+            data = _parse(res.choices[0].message.content, len(courses))
             for c, d in zip(courses, data):
                 c["description"], c["motivation"] = d["description"].strip(), d["motivation"].strip()
                 c["tips"] = c["tips"] + [t.strip() for t in d["tips"][:3]]

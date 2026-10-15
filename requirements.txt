@@ -2,4 +2,4 @@ fastapi
 uvicorn
 networkx
 numpy
-anthropic
+openai

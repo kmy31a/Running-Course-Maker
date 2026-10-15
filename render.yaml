@@ -8,4 +8,4 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.7
-      # LLM 문구를 켜려면 Render 대시보드에서 ANTHROPIC_API_KEY를 추가하세요 (없으면 규칙 문구 사용)
+      # LLM 문구를 켜려면 Render 대시보드에서 OPENAI_API_KEY(필요하면 OPENAI_MODEL)를 추가하세요 (없으면 규칙 문구 사용)
