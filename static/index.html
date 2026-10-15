@@ -52,6 +52,7 @@ select:focus,input[type=number]:focus{border-color:var(--brand)}
 .desc{margin:12px 2px 8px;font-size:14px}
 .note{border-radius:12px;padding:10px 14px;font-size:13.5px;margin-top:8px}.note b{display:block;margin-bottom:2px}
 .note ul{margin:2px 0 0;padding-left:18px}.tips{background:var(--amber-s)}.interval{background:var(--red-s)}
+.ai{text-align:right;font-size:11px;color:var(--mute);margin-top:4px}
 .motive{margin-top:10px;padding:10px 14px;border-radius:12px;background:var(--brand-s);color:var(--brand-d);font-size:14px;font-weight:700;text-align:center}
 @media(prefers-color-scheme:dark){.motive{color:var(--brand)}}
 .rec{width:100%;margin-top:12px;padding:13px;font-size:15px;font-weight:700;font-family:inherit;color:var(--brand-d);background:transparent;border:2px solid var(--brand);border-radius:12px;cursor:pointer}
@@ -163,7 +164,7 @@ $("go").onclick=async()=>{
    <p class="desc">${c.description}</p>
    ${c.interval_plan?`<div class="note interval"><b>⚡ 인터벌 구성</b>${c.interval_plan}</div>`:""}
    <div class="note tips"><b>💡 운동 팁</b><ul>${c.tips.map(t=>`<li>${t}</li>`).join("")}</ul></div>
-   <div class="motive">${c.motivation}</div>
+   <div class="motive">${c.motivation}</div>${data.text_source==="llm"?'<div class="ai">✨ AI가 작성한 문구예요</div>':""}
    ${$("start").value==="__gps__"?`<button class="rec track" onclick="startTrack(${c.idx})">▶ 이 코스로 실시간 추적 시작</button>`:""}
    <button class="rec" id="rec${c.idx}" onclick="record(${c.idx})">✔ 이 코스 완료 기록하기 (계획대로)</button>
   </article>`).join("");

@@ -32,26 +32,41 @@ def _fallback(c, ctx):
     c["tips"] = c["tips"] + [GOAL_TIP[ctx["goal"]]]
     c["motivation"] = GOAL_MOTIVE[ctx["goal"]]
 
+def _parse(text, n):
+    """LLM 응답에서 JSON 배열을 꺼내 검증한다. 형식이 틀리면 ValueError."""
+    data = json.loads(text[text.index("["): text.rindex("]") + 1])
+    if not isinstance(data, list) or len(data) != n:
+        raise ValueError(f"코스 {n}개가 필요한데 {len(data) if isinstance(data, list) else '?'}개 응답")
+    for d in data:
+        if not (isinstance(d.get("description"), str) and isinstance(d.get("motivation"), str)
+                and isinstance(d.get("tips"), list) and all(isinstance(t, str) for t in d["tips"])):
+            raise ValueError("description/tips/motivation 형식 오류")
+    return data
+
 def enrich(courses, ctx):
-    """courses 각 항목에 description / tips(추가) / motivation을 채운다."""
+    """courses 각 항목에 description / tips(추가) / motivation을 채우고, 사용한 방식('llm'|'rule')을 돌려준다."""
     if os.environ.get("ANTHROPIC_API_KEY"):
         try:
             import anthropic
             facts = [{"분": c["minutes"], "거리km": c["distance_km"], "칼로리kcal": c["kcal"],
-                      "풍경일치%": c["scenery_match"], "다리·육교구간m": c["uphill_m"], "인터벌구성": c.get("interval_plan")} for c in courses]
-            prompt = (f"러닝·산책 코스 앱의 문구를 써줘. 출발지 {ctx['start']}(인천 송도), 페이스 {ctx['pace']}, 난이도 {ctx['type']}, "
-                      f"목표 {ctx['goal']}, 선호 풍경 {ctx['scenery']}.\n코스 사실(수치는 절대 바꾸지 말 것): {json.dumps(facts, ensure_ascii=False)}\n"
-                      '각 코스마다 description(1~2문장), tips(목표에 맞는 팁 2개 문자열 배열), motivation(1문장). '
-                      '단위는 km, kcal, 분만 사용. JSON 배열만 출력: [{"description":..,"tips":[..],"motivation":..}, ...] (코스 순서 동일)')
-            msg = anthropic.Anthropic().messages.create(
-                model=MODEL, max_tokens=1200, messages=[{"role": "user", "content": prompt}])
-            text = msg.content[0].text
-            data = json.loads(text[text.index("["): text.rindex("]") + 1])
+                      "풍경일치%": c["scenery_match"], "다리·육교구간m": c["uphill_m"], "인터벌구성": c.get("interval_plan")}
+                     for c in courses]
+            prompt = (
+                f"러닝·산책 코스 앱의 문구를 써줘. 출발지 {ctx['start']}(인천 송도), 페이스 {ctx['pace']}, "
+                f"난이도 {ctx['type']}, 목표 {ctx['goal']}, 선호 풍경 {ctx['scenery']}.\n"
+                f"코스 사실(수치는 절대 바꾸거나 새로 만들지 말 것): {json.dumps(facts, ensure_ascii=False)}\n"
+                "각 코스마다 description(1~2문장, 친근한 존댓말), tips(목표에 맞는 팁 정확히 2개, 문자열 배열), motivation(1문장). "
+                "단위는 km, kcal, 분만 사용. 오르막은 '다리·육교 구간'이라고만 표현하고 경사·고도는 언급하지 말 것.\n"
+                'JSON 배열만 출력: [{"description":"..","tips":["..",".."],"motivation":".."}, ...] '
+                f"(코스 순서 동일, 총 {len(courses)}개)")
+            msg = anthropic.Anthropic(timeout=20.0, max_retries=1).messages.create(
+                model=MODEL, max_tokens=1500, messages=[{"role": "user", "content": prompt}])
+            data = _parse(msg.content[0].text, len(courses))
             for c, d in zip(courses, data):
-                c["description"], c["motivation"] = d["description"], d["motivation"]
-                c["tips"] = c["tips"] + list(d["tips"])
+                c["description"], c["motivation"] = d["description"].strip(), d["motivation"].strip()
+                c["tips"] = c["tips"] + [t.strip() for t in d["tips"][:3]]
             return "llm"
         except Exception as e:
-            print("LLM 실패, 규칙 기반으로 대체:", e)
+            print("LLM 실패, 규칙 기반으로 대체:", type(e).__name__, e)
     for c in courses: _fallback(c, ctx)
     return "rule"
