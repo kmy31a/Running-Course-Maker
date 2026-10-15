@@ -1,2 +1,35 @@
+# ── 비밀 값 (API 키) ─────────────────────────────
 .env
+.env.*
+!.env.example
+
+# ── Python ──────────────────────────────────────
 __pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ── 로그·임시 파일 ───────────────────────────────
+*.log
+*.tmp
+*.bak
+
+# ── 에디터·OS ───────────────────────────────────
+.vscode/
+.idea/
+.claude/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── OSM 다운로드 캐시 (build_graph.py 실행 시 생성) ─
+cache/
+
+# ※ 배포에 필요한 data/songdo.graphml 은 일부러 제외하지 않습니다.
