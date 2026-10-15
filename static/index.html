@@ -53,6 +53,7 @@ select:focus,input[type=number]:focus{border-color:var(--brand)}
 .note{border-radius:12px;padding:10px 14px;font-size:13.5px;margin-top:8px}.note b{display:block;margin-bottom:2px}
 .note ul{margin:2px 0 0;padding-left:18px}.tips{background:var(--amber-s)}.interval{background:var(--red-s)}
 .bot{font-style:normal}.aili{list-style:none;margin-left:-18px}
+.wait{animation:pulse 1.2s infinite}@keyframes pulse{50%{opacity:.35}}
 .ai{text-align:right;font-size:11px;color:var(--mute);margin-top:4px}
 .motive{margin-top:10px;padding:10px 14px;border-radius:12px;background:var(--brand-s);color:var(--brand-d);font-size:14px;font-weight:700;text-align:center}
 @media(prefers-color-scheme:dark){.motive{color:var(--brand)}}
@@ -97,7 +98,7 @@ footer{text-align:center;font-size:12px;color:var(--mute);margin-top:28px}
  <div class="grp"><div class="lab">👟 페이스</div><div class="opts" id="pace"></div></div>
  <div class="grp"><div class="lab">⛰ 난이도</div><div class="opts" id="type"></div></div>
  <div class="grp"><div class="lab">🎯 목표</div><div class="opts" id="goal"></div></div>
- <div class="grp"><div class="lab">🌿 풍경 <em>복수 선택</em></div><div class="opts" id="scenery"></div></div>
+ <div class="grp"><div class="lab">🌿 풍경 <em>복수 선택 · 야경은 공원·수변 구간 기준의 추정이에요</em></div><div class="opts" id="scenery"></div></div>
  <div class="grp"><div class="lab">⚖ 체중 <em>칼로리 계산용 (kg)</em></div><input id="weight" type="number" value="65" min="30" max="200" inputmode="numeric"></div>
  <button id="go">코스 추천받기</button>
 </main>
@@ -184,10 +185,10 @@ $("go").onclick=async()=>{
     ${typ==="오르막"?`<div class="st"><i>⛰</i><b>${c.uphill_m}</b><small>m 다리·육교</small></div>`:""}
    </div>
    <div class="map" id="m${i}"></div>
-   <p class="desc">${c.ai?'<span class="bot" title="GPT가 작성">🤖</span> ':""}${c.description}</p>
+   <p class="desc" id="d${c.idx}">${c.description}</p>
    ${c.interval_plan?`<div class="note interval"><b>⚡ 인터벌 구성</b>${c.interval_plan}</div>`:""}
-   <div class="note tips"><b>💡 운동 팁</b><ul>${c.tips.map(t=>`<li>${t}</li>`).join("")}${(c.ai_tips||[]).map(t=>`<li class="aili"><span class="bot" title="GPT가 작성">🤖</span> ${t}</li>`).join("")}</ul></div>
-   <div class="motive">${c.ai?'<span class="bot" title="GPT가 작성">🤖</span> ':""}${c.motivation}</div>${c.ai?'<div class="ai">🤖 표시는 GPT가 작성한 문구예요</div>':""}
+   <div class="note tips"><b>💡 운동 팁</b><ul id="t${c.idx}">${c.tips.map(t=>`<li>${t}</li>`).join("")}</ul></div>
+   <div class="motive" id="mv${c.idx}">${c.motivation}</div><div class="ai" id="ai${c.idx}">${data.llm?'<span class="wait">🤖 GPT가 문구를 쓰는 중…</span>':""}</div>
    ${$("start").value==="__gps__"?`<button class="rec track" onclick="startTrack(${c.idx})">▶ 이 코스로 실시간 추적 시작</button>`:""}
    <button class="rec" id="rec${c.idx}" onclick="record(${c.idx})">✔ 이 코스 완료 기록하기 (계획대로)</button>
   </article>`).join("");
@@ -198,7 +199,29 @@ $("go").onclick=async()=>{
   m.fitBounds(l.getBounds(),{padding:[18,18]});
   L.circleMarker(c.path[0],{radius:9,color:"#fff",weight:3,fillColor:"#0b6b45",fillOpacity:1}).addTo(m).bindTooltip("출발 · 도착");});
  $("result").scrollIntoView({behavior:"smooth"});
+ if(data.llm) narrateText(data,sc,startName);
 };
+
+// 코스를 먼저 보여준 뒤, GPT 문구는 따로 받아 카드에 채운다 (🤖 = GPT가 작성한 문구)
+async function narrateText(data,sc,startName){
+  const note=(i,t)=>{const e=$("ai"+i);if(e)e.innerHTML=t;};
+  try{
+    const res=await fetch("/api/narrate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+      start:startName,pace:data.pace,type:data.type,goal:val("goal"),scenery:sc,
+      courses:data.courses.map(c=>({minutes:c.minutes,distance_km:c.distance_km,kcal:c.kcal,uphill_m:c.uphill_m,interval_plan:c.interval_plan||null,tips:c.tips}))})});
+    const r=await res.json();
+    if(LAST!==data) return;                       // 그 사이 새로 추천받았다면 무시
+    if(!res.ok||!r.ok) throw new Error(r.detail||r.reason);
+    data.courses.forEach((c,k)=>{const it=r.items[k];if(!it)return;
+      Object.assign(c,{description:it.description,motivation:it.motivation,ai_tips:it.ai_tips,ai:true});
+      $("d"+c.idx).innerHTML=BOT+" "+it.description;
+      $("mv"+c.idx).innerHTML=BOT+" "+it.motivation;
+      $("t"+c.idx).insertAdjacentHTML("beforeend",it.ai_tips.map(t=>`<li class="aili">${BOT} ${t}</li>`).join(""));
+      note(c.idx,"🤖 표시는 GPT가 작성한 문구예요");
+    });
+  }catch(e){ if(LAST===data) data.courses.forEach(c=>note(c.idx,"GPT 문구를 불러오지 못해 기본 문구를 보여드려요")); }
+}
+const BOT='<span class="bot" title="GPT가 작성">🤖</span>';
 
 // ---- 운동 기록 · 주간 루틴 · 배지 (브라우저 localStorage에 저장) ----
 const KEY="songdo_runlog", WEEK_GOAL=3;

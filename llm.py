@@ -5,7 +5,7 @@ import os, json
 def _load_env(path=os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")):
     """songdo/.env 의 KEY=VALUE 줄을 환경변수로 읽는다 (이미 설정된 값은 유지)."""
     if os.path.exists(path):
-        for line in open(path, encoding="utf-8"):
+        for line in open(path, encoding="utf-8-sig"):
             if "=" in line and not line.lstrip().startswith("#"):
                 k, v = line.strip().split("=", 1)
                 os.environ.setdefault(k.strip(), v.strip().strip("\"'"))
@@ -25,12 +25,18 @@ GOAL_MOTIVE = {
     "힐링": "잠시 멈춰 숨 돌리는 시간, 오늘도 잘 오셨어요.",
 }
 
-def _fallback(c, ctx):
+def enabled():
+    return bool(os.environ.get("OPENAI_API_KEY"))
+
+def rule_fill(courses, ctx):
+    """LLM 없이 규칙 기반 설명·팁·응원 문구를 채운다 (즉시 응답용 / LLM 실패 시 대체)."""
     scen = "·".join(ctx["scenery"])
-    c["description"] = (f"{ctx['start']}에서 출발해 {scen} 풍경을 따라 약 {c['distance_km']}km를 "
-                        f"{c['minutes']}분 동안 돌아오는 순환 코스예요.")
-    c["tips"] = c["tips"] + [GOAL_TIP[ctx["goal"]]]
-    c["motivation"] = GOAL_MOTIVE[ctx["goal"]]
+    for c in courses:
+        c["description"] = (f"{ctx['start']}에서 출발해 {scen} 풍경을 따라 약 {c['distance_km']}km를 "
+                            f"{c['minutes']}분 동안 돌아오는 순환 코스예요.")
+        c["tips"] = c["tips"] + [GOAL_TIP[ctx["goal"]]]
+        c["motivation"] = GOAL_MOTIVE[ctx["goal"]]
+        c["ai"] = False
 
 def _parse(text, n):
     """LLM 응답에서 JSON 배열을 꺼내 검증한다. 형식이 틀리면 ValueError."""
@@ -48,31 +54,54 @@ def _parse(text, n):
             raise ValueError("description/tips/motivation 형식 오류")
     return data
 
+def _prompt(courses, ctx):
+    hill = ctx["type"] == "오르막"
+    facts = []
+    for c in courses:
+        f = {"분": c["minutes"], "거리km": c["distance_km"], "칼로리kcal": c["kcal"],
+             "기본팁(이미 화면에 있음)": c.get("tips", [])}
+        if c.get("interval_plan"): f["인터벌구성"] = c["interval_plan"]
+        if hill: f["다리·육교구간m"] = c["uphill_m"]   # 오르막이 아닌 코스에선 다리 정보를 주지 않는다(모순처럼 읽혀서)
+        facts.append(f)
+    night = "야경" in ctx["scenery"]
+    rules = [
+        "수치(거리·칼로리·분·세트 수)는 아래 사실에 있는 값만 쓰고 바꾸거나 새로 만들지 말 것.",
+        "단위는 km, kcal, 분만 사용하고 숫자에 붙여 쓸 것(예: 2.3km, 152kcal, 20분).",
+        "세 코스의 description·motivation은 서로 다른 표현으로 써서 같은 문장을 반복하지 말 것(시간 길이에 맞는 분위기로).",
+        "풍경 일치율(%)이나 점수는 문장에 넣지 말 것.",
+        f"'페이스 {ctx['pace']}' 같은 어색한 합성어 대신 '{ctx['pace']}'처럼 자연스럽게 쓸 것.",
+        "tips는 '기본팁'과 겹치거나 상충하지 않는 새로운 내용으로, 목표에 맞게 정확히 2개.",
+        "description은 1~2문장, 친근한 존댓말. 출발지 이름은 한 번만 쓰고 '(인천 송도)'는 붙이지 말 것.",
+        "motivation은 1문장.",
+    ]
+    if hill: rules.append("오르막은 '다리·육교 구간'이라고만 표현하고 경사·고도·언덕은 언급하지 말 것.")
+    else: rules.append("다리·육교·경사·고도는 언급하지 말 것.")
+    if night: rules.append("'야경'은 조명 데이터가 아니라 공원·수변 구간으로 추정한 값이므로, 야경이 보인다고 단정하지 말고 "
+                           "'저녁에 걷기 좋은 공원·수변 길' 정도로만 표현할 것.")
+    return (f"러닝·산책 코스 앱 '송도 코스 메이커'의 문구를 써줘. 출발지 {ctx['start']}, 페이스 {ctx['pace']}, "
+            f"난이도 {ctx['type']}, 목표 {ctx['goal']}, 선호 풍경 {'·'.join(ctx['scenery'])}.\n"
+            f"코스 사실: {json.dumps(facts, ensure_ascii=False)}\n"
+            "규칙:\n" + "\n".join(f"- {r}" for r in rules) + "\n"
+            'JSON 배열만 출력: [{"description":"..","tips":["..",".."],"motivation":".."}, ...] '
+            f"(코스 순서 동일, 총 {len(courses)}개)")
+
+def narrate(courses, ctx):
+    """GPT로 코스별 {description, ai_tips, motivation} 목록을 만든다. 실패하면 예외."""
+    from openai import OpenAI
+    res = OpenAI(timeout=45.0, max_retries=1).chat.completions.create(
+        model=MODEL, messages=[{"role": "user", "content": _prompt(courses, ctx)}])
+    data = _parse(res.choices[0].message.content, len(courses))
+    return [{"description": d["description"].strip(), "ai_tips": [t.strip() for t in d["tips"][:3]],
+             "motivation": d["motivation"].strip()} for d in data]
+
 def enrich(courses, ctx):
-    """courses 각 항목에 description / tips(추가) / motivation을 채우고, 사용한 방식('llm'|'rule')을 돌려준다."""
-    if os.environ.get("OPENAI_API_KEY"):
+    """(스크립트·테스트용) 한 번에 채운다. 사용한 방식 'llm' | 'rule'을 돌려준다."""
+    rule_fill(courses, ctx)
+    if enabled():
         try:
-            from openai import OpenAI
-            facts = [{"분": c["minutes"], "거리km": c["distance_km"], "칼로리kcal": c["kcal"],
-                      "풍경일치%": c["scenery_match"], "다리·육교구간m": c["uphill_m"], "인터벌구성": c.get("interval_plan")}
-                     for c in courses]
-            prompt = (
-                f"러닝·산책 코스 앱의 문구를 써줘. 출발지 {ctx['start']}(인천 송도), 페이스 {ctx['pace']}, "
-                f"난이도 {ctx['type']}, 목표 {ctx['goal']}, 선호 풍경 {ctx['scenery']}.\n"
-                f"코스 사실(수치는 절대 바꾸거나 새로 만들지 말 것): {json.dumps(facts, ensure_ascii=False)}\n"
-                "각 코스마다 description(1~2문장, 친근한 존댓말), tips(목표에 맞는 팁 정확히 2개, 문자열 배열), motivation(1문장). "
-                "단위는 km, kcal, 분만 사용. 오르막은 '다리·육교 구간'이라고만 표현하고 경사·고도는 언급하지 말 것.\n"
-                'JSON 배열만 출력: [{"description":"..","tips":["..",".."],"motivation":".."}, ...] '
-                f"(코스 순서 동일, 총 {len(courses)}개)")
-            res = OpenAI(timeout=20.0, max_retries=1).chat.completions.create(
-                model=MODEL, messages=[{"role": "user", "content": prompt}])
-            data = _parse(res.choices[0].message.content, len(courses))
-            for c, d in zip(courses, data):
-                c["description"], c["motivation"] = d["description"].strip(), d["motivation"].strip()
-                c["ai_tips"] = [t.strip() for t in d["tips"][:3]]   # GPT가 쓴 팁은 따로 둬서 화면에서 🤖로 구분한다
-                c["ai"] = True
+            for c, d in zip(courses, narrate(courses, ctx)):
+                c.update(description=d["description"], motivation=d["motivation"], ai_tips=d["ai_tips"], ai=True)
             return "llm"
         except Exception as e:
             print("LLM 실패, 규칙 기반으로 대체:", type(e).__name__, e)
-    for c in courses: _fallback(c, ctx)
     return "rule"

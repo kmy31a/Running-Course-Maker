@@ -39,12 +39,14 @@ for _, _, d in G.edges(data=True):
 FAST, SLOW = 1.3, 0.7   # 인터벌: 빠르게/천천히 속도 배율
 
 def interval_plan(pace, minutes):
-    """워밍업5 + (빠르게1 + 천천히2)×n + 쿨다운5. 평균 속도와 구성 안내를 돌려준다."""
+    """워밍업5 + (빠르게·천천히)×n + 쿨다운5. 세트 수가 10을 넘지 않도록 40분 초과는 한 세트를 길게(2분+3분) 잡는다."""
     base = PACES[pace]
-    n = (minutes - 10) // 3
-    rest = minutes - 10 - n * 3
-    km = (5 * SLOW + n * (FAST + 2 * SLOW) + rest * SLOW + 5 * SLOW) * base / 60
-    text = f"워밍업 5분 → (빠르게 1분 + 천천히 2분) × {n}세트" + (f" + 천천히 {rest}분" if rest else "") + " → 쿨다운 5분"
+    f, w = (1, 2) if minutes <= 40 else (2, 3)       # 빠르게 f분 + 천천히 w분
+    n = (minutes - 10) // (f + w)
+    rest = minutes - 10 - n * (f + w)
+    km = (5 * SLOW + n * (f * FAST + w * SLOW) + rest * SLOW + 5 * SLOW) * base / 60
+    text = (f"워밍업 5분 → (빠르게 {f}분 + 천천히 {w}분) × {n}세트"
+            + (f" + 천천히 {rest}분" if rest else "") + " → 쿨다운 5분")
     return km / minutes * 60, text
 
 def speed_of(pace, typ, minutes):
